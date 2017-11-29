@@ -1,6 +1,6 @@
 <?php
 
-namespace Jobs\Model\Process\DataTransfer\Acquisition\Rentree\Preinscription;
+namespace Jobs\Model\Process\DataTransfer\Acquisition\Rentree\Etudiants\Preinscription;
 
 use Minibus\Model\Process\DataTransfer\EndPointConnection;
 
@@ -36,7 +36,7 @@ class PreinscriptionLoader {
     	} */
 	
 	public function getcandPCL($idcandpcl) {
-	    idcandpcl = '';
+	    $idcandpcl = '';
 	    $params = array (
 	        ':idcandpcl' => idcandpcl
 	    );
@@ -59,7 +59,7 @@ class PreinscriptionLoader {
 	
 	public function getSitMaritale ($sitmaritale)
 	{
-	    sitmaritale = '';
+	    $sitmaritale = '';
 	    $params = array (
 	        ':sitmaritale' => sitmaritale
 	    );
@@ -85,12 +85,12 @@ class PreinscriptionLoader {
         
     public function getMaster() {
     
-        ine = '';
+        $ine = '';
         $params = array (
             ':ine' => ine
         );
         $sqlIne = "select * from etudiant
-		where id_niveauForm!=1 AND (INE_valid=1 OR  valideDeve=1) ";
+		where id_niveauForm!=1 AND (INE_valid=1 OR  valideDeve=1) AND archive=0 ";
         
         $resultatSqlIne = $this->pdo->prepare ( $sqlIne );
         $resultatSqlIne->execute ( $params );
@@ -104,35 +104,7 @@ class PreinscriptionLoader {
             }
        }
        
-       // Ajoute seulement les étudiants pour ceux qui ont id_candidat_PCL différent de NULL
-       
-       /*public function getCandidatPCL($candpcl) {
-           candpcl = '';
-           $params = array (
-               ':candpcl' => candpcl
-           );
-           $sqlCandPcl = "select * from etudiant
-		where id_candidat_PCL!='' ";
-           
-           $resultatCandPcl = $this->pdo->prepare ( $sqlCandPcl );
-           $resultatSqlCandPcl->execute ( $params );
-           
-           if ($resultatSqlCandPcl != null) {
-               
-               $tableauCandPcl = $resultatSqlCandPcl->fetchAll ( \PDO::FETCH_ASSOC );
-               foreach ( $tableauCandPcl as $valCandPcl ) {
-                   $candpcl = $valCandPcl ['id_candidat_PCL'];
-               }
-           }
-       }
-      */
-       
-       /* 
-        * requete pour tout les type form et liebele A REVOIR 
-        * 
-        * SELECT niveauForm.id_niveauForm, niveauForm.libelle, niveauForm.id_typeForm, typeForm.libelle 
-        * FROM niveauForm,typeForm 
-        * WHERE niveauForm.id_typeForm=typeForm.id_typeForm */
+       // FAIRE UN GET ADRESSE EN FONCTION DE LA TABLE ADRESSE
 
 	
 	/**
@@ -142,6 +114,6 @@ class PreinscriptionLoader {
 	public function __construct(EndPointConnection $pdo)
 	{
 		$this->pdo = $pdo;
-		$this->initTableauNiveauForm ();
+		//$this->initTableauNiveauForm ();
 	}
 }
