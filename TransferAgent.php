@@ -5,7 +5,7 @@ use Minibus\Model\Process\DataTransfer\Export\AbstractDataExportAgent;
 use Minibus\Model\Entity\Execution;
 use Jobs\Model\Entity\Personne;
 use Jobs\Model\Entity\DossierEtudiant;
-use Jobs\Model\Process\DataTransfer\Acquisition\Rentree\ConvertPersonne;
+//use Jobs\Model\Process\DataTransfer\Acquisition\Rentree\ConvertPersonne;
 use Doctrine\DBAL\Driver\PDOException;
 
 use Jobs\Model\Entity\AttributionPersonne;
@@ -38,7 +38,7 @@ class TransferAgent extends AbstractDataExportAgent
 		$elementPersonnesRepository = $this->getElementPersonnesRepository ( $em );
 		
 		$am = $this->getEntityManager ();
-		$elementDossierRepository = $this->getElementDossierRepository ( $am);
+		$elementDossierRepository = $this->getElementDossierRepository ( $am); 
 
 		$this->getLogger ()
 		->info ( "Début acquisition étudiants depuis Préinscription" );
@@ -89,8 +89,13 @@ class TransferAgent extends AbstractDataExportAgent
 		foreach ( $etudiants as $etudiant ) 
         {
 		    
-		    //$sitMaritale = $preinscriptionLoader->getSitMaritale($sitmaritale);
-            $sitMaritale = $etudiant ['id_situation_familiale'];
+            $id_etudiant = $etudiant ['id_etudiant'];
+            
+		    $codePostal = $preinscriptionLoader->getCodePostal($id_etudiant);
+		    $adresse1 = $preinscriptionLoader->getAdresse($id_etudiant);
+		    $localite = $preinscriptionLoader->getLocalite($id_etudiant);
+            
+            $sitMaritaleEtu = $etudiant ['id_situation_familiale'];
 		    $idEtudiantPreinscription = $etudiant ['id_etudiant'];
 		    $idCandidatPCL = $etudiant ['id_candidat_PCL'];
 		    $login = $etudiant ['login_ldap'];
@@ -113,8 +118,9 @@ class TransferAgent extends AbstractDataExportAgent
 		    $bpubliphoto = $etudiant ['photo_valide'];
 		    $numsecu = $etudiant ['N_Securite_Soc'];
 		    
-		    $etudiant_id = $etudiant ['id_etudiant'];
-		    $ine = $etudiant ['INE'];
+		    //DOSSIER
+		    //$etudiant = $etudiant ['id_etudiant'];
+		    //$ine = $etudiant ['INE'];
 		    
 		   
 		    
@@ -122,32 +128,57 @@ class TransferAgent extends AbstractDataExportAgent
 		   //$this->getLogger ()->info ( "Date : " .$datenaiss);
 		   //$this->getLogger ()->info ( "Prenom :" .$prenom);
 		    
-		    if ($idCandidatPCL == null) {
+		   //$this->getLogger ()->info ( "idpcl :" .$idCandidatPCL);
+		    if ($idCandidatPCL == null) 
+		    {
 		        
-		    //id 
-		    $idexterne = "preetu".$idEtudiantPreinscription;
-		    $etudiantPED = $elementPersonnesRepository->findBy ( array (
-		        'idexterne' => $idexterne));
+    		    //id 
+    		    $idexterne = "preetu".$idEtudiantPreinscription;
+    		    $etudiantPED = $elementPersonnesRepository->findBy ( array (
+    		        'idexterne' => $idexterne));
+    		    
+    		    //prenom1
+    		    $prenomP = explode(",",$prenom);
+    
+    		   // $this->getLogger ()->info ( "PrenomP :".$prenomP[0]);
+    		    $prenom1= $this->encodeIfNonUTF8($prenomP[0]);
+    		    
+    		    // Civilité par rapport au sexe
+    		    //FAIRE UN CASE
+    		    $civilite="";
 		    
-		    //prenom1
-		    $prenomP = explode(",",$prenom);
+        		    if ($sexe == 'H')
+        		    {
+        		        $civilite= "M";
+        		    }
+        		    
+        		    else
+        		    {
+        		        $civilite= "Mme";
+        		    }
+        		    
+        		    //Situation Maritale
+        		    $sitMaritale="";
+        		    
+        		    if ($sitMaritaleEtu =1)
+        		    {
+        		        $sitMaritale="Celibataire";
+        		    }
+        		    
+        		    else 
+        		    {
+        		        $sitMaritale="Marié";
+        		    }
+		    
+        		    //$this->getLogger()->info ("Candidat :".$idexterne ." "."CP :". $codePostal);
+        
+        		   // $this->getLogger()->info ("Ancien :".$sitMaritaleEtu."New :".$sitMaritale);
+        		    
+        		    $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $codePostal, $localite, $mail, $adresse1, $bpubliphoto, $numsecu );
+        		    
+        		    //$this->insertDossetu($am, $etudiant, $ine);
 
-		    $this->getLogger ()->info ( "PrenomP :".$prenomP[0]);
-		    $prenom1= $this->encodeIfNonUTF8($prenomP[0]);
-		    
-		    // Civilité par rapport au sexe
-		    $civilite = " ";
-		    
-		    if ($sexe == 'M'){
-		        $civilite= "M";
-		    }
-		    else{
-		        $civilite= "Mme";
-		    }
-
-		    $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $mail, $bpubliphoto, $numsecu );
-		    $this->insertDossetu($am, $etudiant_id, $ine);
-		    }
+		   }
 		    /*
 		    if (id_candidat_PCL!=NULL) $allPersonnes = $elementPersonnesRepository->findBy ( array (
 		        'id_candidat' => $idCandidatPCL
@@ -169,23 +200,43 @@ class TransferAgent extends AbstractDataExportAgent
 		          
 		          $prenomP = explode(",",$prenom);
 		          
-		          $this->getLogger ()->info ( "PrenomP :".$prenomP[0]);
+		          //$this->getLogger ()->info ( "PrenomP :".$prenomP[0]);
 		          $prenom1= $this->encodeIfNonUTF8($prenomP[0]);
 		          
 		          // Civilité par rapport au sexe
 		          $civilite = " ";
 		          
-		          if ($sexe == 'M'){
+		          if ($sexe == 'H'){
 		              $civilite= "M";
 		          }
 		          else{
 		              $civilite= "Mme";
 		          }
+		    
+		          //Civilité ( FAIRE UN CASE)
 		          
-		          $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $mail, $bpubliphoto, $numsecu );
-		          $this->insertDossetu($am, $etudiant_id, $ine);
+		          $sitMaritale = " ";
+		          
+		          if ($sitMaritaleEtu ==0) {
+		              
+		              $sitMaritale="Non indiqué";
+		          }
+		          
+		          if ($sitMaritaleEtu ==1)
+		          {
+		              $sitMaritale="Célibataire";
+		          }
+		          
+		          if ( $sitMaritaleEtu ==2) {
+		              
+		              $sitMaritale="Marié(e)";
+		          }
+		          
+		          
+		          $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $codePostal, $localite, $mail, $adresse1, $bpubliphoto, $numsecu );
+		          //$this->insertDossetu($am, $etudiant, $ine);
 		      }
-        }
+      }
 		    
 // 		    foreach ($allpersonnes as $personne)
 		   
@@ -275,12 +326,12 @@ class TransferAgent extends AbstractDataExportAgent
 	
 	
 	// Insert idexterne dans personne pour un étudiant première année
-	public function insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $mail, $bpubliphoto, $numsecu)
+	public function insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $codePostal, $localite, $mail, $adresse1, $bpubliphoto, $numsecu)
 	{
 	    	        
 	        $preEtu = New \Jobs\Model\Entity\Personne();
 	        $preEtu->setIdExterne( $idexterne);
-	        $preEtu->setcivilite( $civilite);
+	        $preEtu->setCivilite( $civilite);
 	        $preEtu->setLogin( $login);
 	        $preEtu->setSexe( $sexe);
 	        $preEtu->setSitMaritale( $sitMaritale);
@@ -294,10 +345,13 @@ class TransferAgent extends AbstractDataExportAgent
 	        //$preEtu->setDateNaiss( $datenaiss);
 	        $preEtu->setIdDeptNaiss( $iddeptnaiss);
 	        $preEtu->setNbEnfants( $nbenfant);
-	        $preEtu->setVilleNaiss( $villenaiss);
+	        $preEtu->setVillenaiss( $villenaiss);
 	        $preEtu->setTelephoneFixe( $telephonefixe);
 	        $preEtu->setTelephoneMobile( $telephonemobile);
+	        $preEtu->setCodePostal( $codePostal);
+	        $preEtu->setLocalite( $localite);
 	        $preEtu->setEmail( $mail);
+	        $preEtu->setAdresse1( $adresse1);
 	        $preEtu->setBpubliphotointranet( $bpubliphoto);
 	        $preEtu->setNumSecu( $numsecu);
 	        //$preEtu->setEmailetb( $emailtab);
@@ -307,17 +361,17 @@ class TransferAgent extends AbstractDataExportAgent
 	    return ;
 	}
 	
-	public function insertDossetu($am, $etudiant_id, $ine)
+	/*public function insertDossetu($am, $etudiant, $ine)
 	{
 	    
 	    $preEtu = New \Jobs\Model\Entity\DossierEtudiant();
-	    $preEtu->setEtudiant ( $etudiant_id);
+	    $preEtu->setEtudiant ( $etudiant);
 	    $preEtu->setIne ( $ine);
 	    $am->persist ( $preEtu );
 	    $am->flush ();
 	    
 	    return ;
-	}
+	}*/ 
 	
 	function isUTF8($string)
 	{
