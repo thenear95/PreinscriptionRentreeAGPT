@@ -14,7 +14,7 @@ class PreinscriptionLoader {
 	{
 		$pdo = $this->pdo;
 		
-		$sqlAllEtudiant = "SELECT * FROM etudiant where archive=0 AND id_niveauForm=1 ";
+		$sqlAllEtudiant = "SELECT * FROM etudiant where (archive=0 AND id_niveauForm=1) OR (id_niveauForm!=1 AND INE_valid=1 OR valideDeve=1 AND archive=0) ";
 		$resultatSqlAllEtudiant = $pdo->prepare ( $sqlAllEtudiant );
 		$resultatSqlAllEtudiant->execute ();
 		$tableauAllEtudiant = $resultatSqlAllEtudiant->fetchAll ( \PDO::FETCH_ASSOC );
@@ -22,90 +22,108 @@ class PreinscriptionLoader {
 		return $tableauAllEtudiant;
 	}
 	
-/*	public function initTableauNiveauForm()
-    	{
-    	    $sqlTableauNiveauForm = "select niveauForm.id_niveauForm,niveauForm.id_typeForm,niveauForm.code_PCL,typeForm.situation_PCL
-    	from niveauForm
-    	inner join typeForm on niveauForm.id_typeForm=typeForm.id_typeForm
-    	where code_PCL is not Null
-    	order by code_PCL";
-    	    
-    	    $resultatSqlTableauNiveauForm = $this->pdo->prepare ( $sqlTableauNiveauForm );
-    	    $resultatSqlTableauNiveauForm->execute ();
-    	    $this->tableauNiveauForm = $resultatSqlTableauNiveauForm->fetchAll ( \PDO::FETCH_ASSOC );
-    	} */
-	
-	public function getcandPCL($idcandpcl) {
-	    $idcandpcl = '';
+	public function getAdresse($id_etudiant)
+	{
+	    $pdo = $this->pdo;
+	    
 	    $params = array (
-	        ':idcandpcl' => idcandpcl
+	        ':id_etudiant' => $id_etudiant
 	    );
-	    $sqlIdCandPCL = "select * from etudiant where id_candidat_PCL IS NOT NULL AND ss_valid=1 AND login_ldap IS NOT NULL";
+	    $sqlAdresse = "SELECT rue, ville, codeP FROM adresse where id_etudiant=:id_etudiant";
+	    $resultatSqlAdresse = $pdo->prepare ( $sqlAdresse );
+	    $resultatSqlAdresse->execute ($params);
+	    $tableauAdresse = $resultatSqlAdresse->fetchAll ( \PDO::FETCH_ASSOC );
 	    
-	    $resultatSqlIdCandPCL = $this->pdo->prepare ( $sqlIdCandPCL );
-	    $resultatSqlIdCandPCL->execute ( $params );
+	    return $tableauAdresse;
+	}
+	
+	public function getInfosParentEtu($id_etudiant)
+	{
+	    $pdo = $this->pdo;
 	    
-	    if ($resultatSqlIdCandPCL != null) {
-	        
-	        $tableauIdCandPCL = $resultatSqlIdCandPCL->fetchAll ( \PDO::FETCH_ASSOC );
-	        foreach ( $tableauIdCandPCL as $valIdCandPCL) {
-	            $idcandpcl = $valIdCandPCL ['id_candidat_pcl'];
-	        }
-	    }
+	    $params = array (
+	        ':id_etudiant' => $id_etudiant
+	    );
+	    $sqlParentEtu = "SELECT * FROM parent where id_etudiant=:id_etudiant";
+	    $resultatSqlParentEtu = $pdo->prepare ( $sqlParentEtu );
+	    $resultatSqlParentEtu->execute ($params);
+	    $tableauParentEtu = $resultatSqlParentEtu->fetchAll ( \PDO::FETCH_ASSOC );
 	    
-	    return $idcandpcl;
+	    return $tableauParentEtu;
 	}
 	
 	
-	public function getSitMaritale ($sitmaritale)
+	public function getCspParent($id_etudiant, $id_lien_parente)
 	{
-	    $sitmaritale = '';
-	    $params = array (
-	        ':sitmaritale' => sitmaritale
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant,
+	        ':id_lien_parente' => $id_lien_parente
 	    );
-	    $sqlSitMaritale = "select etudiant.id_etudiant, situation_familiale.libelle from etudiant, situation_familiale
-		where situation_familiale.id_situation_familiale=:etudiant.id_situation_familiale ";
+	    $sqlCspPar = "SELECT profession.libelle
+        FROM  parent inner join etudiant on parent.id_etudiant=etudiant.id_etudiant
+        LEFT JOIN profession on parent.id_profession = profession.id_profession
+        WHERE etudiant.id_etudiant = :id_etudiant
+        AND parent.id_lien_parente=:id_lien_parente";
+	    $resultatSqlCspPar = $pdo->prepare($sqlCspPar);
+	    $resultatSqlCspPar->execute($params);
+	    $tableauCspPar = $resultatSqlCspPar->fetchAll(\PDO::FETCH_ASSOC);
 	    
-	    $resultatSqlSitMaritale = $this->pdo->prepare ( $sqlSitMaritale );
-	    $resultatSqlSitMaritale->execute ( $params );
+	    return $tableauCspPar;
+	}
+	
+	/*
+	public function getCsppere($id_profession)
+	{
+	    $csppere = '';
+	    $params = array (
+	        ':id_profession' => $id_profession
+	    );
+	    $sqlCsppere = "SELECT profession.libelle FROM profession, parent, etudiant WHERE profession.id_profession=:parent.id_profession AND parent.id_etudiant=etudiant.id_etudiant AND parent.id_lien_parente=1 ";
 	    
-	    if ($resultatSqlSitMaritale != null) {
+	    $resultatSqlCsppere= $this->pdo->prepare ( $sqlCsppere );
+	    $resultatSqlCsppere->execute ( $params );
 	    
-	    $tableauSitMaritale = $resultatSqlSitMaritale->fetchAll ( \PDO::FETCH_ASSOC );
-	    foreach ( $tableauSitMaritale as $valSitMaritale ) {
-	    $sitmaritale = $valSitMarital ['situation_maritale'];
+	    if ($resultatSqlCsppere != null) {
+	        
+	        $tableauCsppere = $resultatSqlCsppere->fetchAll ( \PDO::FETCH_ASSOC );
+	        foreach ( $tableauCsppere as $valCsppere )
+	        {
+	            $csppere = $valCsppere ['libelle'];
+	        }
 	    }
+	    
+	    return $csppere;
+	}
+	
+	
+	public function getCspmere($id_profession)
+	{
+	    $cspmere = '';
+	    $params = array (
+	        ':id_profession' => $id_profession
+	    );
+	    $sqlCspere = "SELECT profession.libelle, etudiant.id_etudiant FROM profession, parent, etudiant WHERE profession.id_profession=parent.id_profession AND parent.id_etudiant=etudiant.id_etudiant AND parent.id_lien_parente=2 ";
+	    
+	    $resultatSqlCspmere= $this->pdo->prepare ( $sqlCspmere );
+	    $resultatSqlCspmere->execute ( $params );
+	    
+	    if ($resultatSqlCspmere != null) {
+	        
+	        $tableauCspmere = $resultatSqlCspmere->fetchAll ( \PDO::FETCH_ASSOC );
+	        foreach ( $tableauCspmere as $valCspmere )
+	        {
+	            $cspmere = $valCspmere ['libelle'];
+	        }
 	    }
 	    
-	    return $sitmaritale;
-    }
-
+	    return $cspmere;
+	} */
+	
+	// Requete permettant de detecter un accent ou caract dans une colone
+	//SELECT * FROM `adresse` where adre LIKE _utf8'%é%' COLLATE utf8_bin
     
-    // Meme résultat que getCandPCL
-        
-    public function getMaster() {
-    
-        $ine = '';
-        $params = array (
-            ':ine' => ine
-        );
-        $sqlIne = "select * from etudiant
-		where id_niveauForm!=1 AND (INE_valid=1 OR  valideDeve=1) AND archive=0 ";
-        
-        $resultatSqlIne = $this->pdo->prepare ( $sqlIne );
-        $resultatSqlIne->execute ( $params );
-        
-        if ($resultatSqlIne != null) {
-            
-            $tableauIne = $resultatSqlIne->fetchAll ( \PDO::FETCH_ASSOC );
-            foreach ( $tableauIne as $valIne ) {
-                $idconcours = $valIne ['id_concours'];
-                }
-            }
-       }
-       
-       // FAIRE UN GET ADRESSE EN FONCTION DE LA TABLE ADRESSE
-
 	
 	/**
 	 *
