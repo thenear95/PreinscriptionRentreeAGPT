@@ -73,6 +73,106 @@ class PreinscriptionLoader {
 	    return $tableauCspPar;
 	}
 	
+	
+	public function getAllInfosBac($id_etudiant)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array (
+	        ':id_etudiant' => $id_etudiant
+	    );
+	    $sqlBacEtu = "SELECT * FROM bac_etu where id_etudiant=:id_etudiant";
+	    $resultatSqlBacEtu = $pdo->prepare ( $sqlBacEtu );
+	    $resultatSqlBacEtu->execute ($params);
+	    $tableauBacEtu = $resultatSqlBacEtu->fetchAll ( \PDO::FETCH_ASSOC );
+	    
+	    return $tableauBacEtu;
+	}
+	
+	public function getSeriebac($id_etudiant, $id_bac)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant,
+	        ':id_bac' => $id_bac
+	    );
+	    $sqlSerieBac = "SELECT bac.libelle, etudiant.id_etudiant, bac_etu.*
+        FROM bac_etu 
+        INNER JOIN etudiant on bac_etu.id_etudiant=etudiant.id_etudiant 
+        LEFT JOIN bac on bac.id_bac = bac_etu.id_bac 
+        WHERE etudiant.id_etudiant =:id_etudiant 
+        AND bac.id_bac=:id_bac ";
+	    $resultatSqlSerieBac = $pdo->prepare($sqlSerieBac);
+	    $resultatSqlSerieBac->execute($params);
+	    $tableauSerieBac = $resultatSqlSerieBac->fetchAll(\PDO::FETCH_ASSOC);
+	    
+	    return $tableauSerieBac;
+	}
+	
+	public function getAcademies($id_etudiant, $id_bac)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant,
+	        ':id_bac' => $id_bac
+	    );
+	    $sqlSerieBac = "SELECT bac.libelle, etudiant.id_etudiant, bac_etu.*, academie.libelle
+        FROM bac_etu
+        INNER JOIN etudiant on bac_etu.id_etudiant=etudiant.id_etudiant
+        LEFT JOIN bac on bac.id_bac = bac_etu.id_bac
+        LEFT JOIN academie on academie.code = bac_etu.id_academie
+        WHERE etudiant.id_etudiant =:id_etudiant
+        AND bac.id_bac=:id_bac ";
+	    $resultatSqlSerieBac = $pdo->prepare($sqlSerieBac);
+	    $resultatSqlSerieBac->execute($params);
+	    $tableauSerieBac = $resultatSqlSerieBac->fetchAll(\PDO::FETCH_ASSOC);
+	    
+	    return $tableauSerieBac;
+	}
+	
+/*	
+	public function getAcademie($id_academie)
+	{
+	    
+	    $pdo = $this->pdo;
+	    
+	    $params = array (
+	        ':id_academie' => $id_academie
+	    );
+
+	    
+	    try {
+	        $sqlAcademie = "SELECT libelle FROM academie WHERE code=:id_academie";
+	        
+	        $resultatSqlAcademie = $pdo->prepare ( $sqlAcademie );
+	        
+	        $resultatSqlAcademie->execute ($params);
+	        
+	        $tableauAcademie = $resultatSqlAcademie->fetchAll ( \PDO::FETCH_ASSOC );
+	    } catch (\Exception $e) {
+	        $message = "Un problème est survenu  : " . $e->getMessage();
+	        self::alertWarn($message);
+	        $this->getLogger()->err($e->getMessage());
+	        $this->setAlive(false);
+	        return;
+	    } 
+	    
+	    
+
+	    
+	   // $this->getLogger()->info("Count : ". count($tableauAcademie));
+	    
+	    foreach (  $tableauAcademie as $value )
+	    {
+	        $lib = $value['libelle'];
+	    }
+	    
+	    return $lib;
+	    
+	}*/
+	
 	/*
 	public function getCsppere($id_profession)
 	{
@@ -98,31 +198,12 @@ class PreinscriptionLoader {
 	}
 	
 	
-	public function getCspmere($id_profession)
-	{
-	    $cspmere = '';
-	    $params = array (
-	        ':id_profession' => $id_profession
-	    );
-	    $sqlCspere = "SELECT profession.libelle, etudiant.id_etudiant FROM profession, parent, etudiant WHERE profession.id_profession=parent.id_profession AND parent.id_etudiant=etudiant.id_etudiant AND parent.id_lien_parente=2 ";
-	    
-	    $resultatSqlCspmere= $this->pdo->prepare ( $sqlCspmere );
-	    $resultatSqlCspmere->execute ( $params );
-	    
-	    if ($resultatSqlCspmere != null) {
-	        
-	        $tableauCspmere = $resultatSqlCspmere->fetchAll ( \PDO::FETCH_ASSOC );
-	        foreach ( $tableauCspmere as $valCspmere )
-	        {
-	            $cspmere = $valCspmere ['libelle'];
-	        }
-	    }
-	    
-	    return $cspmere;
-	} */
-	
 	// Requete permettant de detecter un accent ou caract dans une colone
 	//SELECT * FROM `adresse` where adre LIKE _utf8'%é%' COLLATE utf8_bin
+	
+	//Requete permettant de remplacer les caractères speciaux par ...
+	/*UPDATE diplome_etu
+	SET intitule = REPLACE(intitule, 'ÃƒÂ©', 'texte de remplacement')*/
     
 	
 	/**
