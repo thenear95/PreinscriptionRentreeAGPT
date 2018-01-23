@@ -59,7 +59,7 @@ class TransferAgent extends AbstractDataExportAgent
             $etudiants = $preinscriptionLoader->getAllEtudiant();
             
             foreach ($etudiants as $etudiant) {
-                $this->getLogger()->info($etudiant['id_etudiant'] . " : " . $etudiant['Nom']);
+                // $this->getLogger()->info($etudiant['id_etudiant'] . " : " . $etudiant['Nom']);
             }
         } catch (\Exception $e) {
             $message = "Un problème est survenu lors de la récupération des personnes dans base de données Rentrée : " . $e->getMessage();
@@ -152,7 +152,7 @@ class TransferAgent extends AbstractDataExportAgent
                 }
                 
                 // $this->getLogger()->info ("Candidat :".$idexterne ." "."CP :". $codePostal);
-                $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $pays, $codePostal, $localite, $mail, $adresse1, $bpubliphoto, $numsecu);
+                $idPers = $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $pays, $codePostal, $localite, $mail, $adresse1, $bpubliphoto, $numsecu);
             } else {
                 
                 $idexterne = "preetu" . $idCandidatPCL;
@@ -192,12 +192,40 @@ class TransferAgent extends AbstractDataExportAgent
                     $sitMaritale = "Marié(e)";
                 }
                 
-                $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $pays, $codePostal, $localite, $mail, $adresse1, $bpubliphoto, $numsecu);
+                $idPers = $this->insertPreetu($em, $idexterne, $login, $civilite, $sexe, $sitMaritale, $nom, $prenom1, $prenomautre, $bpublinommari, $codenationalite, $codedblnationalite, $codepaysnaiss, /*$datenaiss,*/ $iddeptnaiss, $nbenfant, $villenaiss, $telephonefixe, $telephonemobile, $pays, $codePostal, $localite, $mail, $adresse1, $bpubliphoto, $numsecu);
             }
             
             // DOSSIER ETU
             
             $infosparents = $preinscriptionLoader->getInfosParentEtu($id_etudiant);
+  
+            
+            $ids_bacs_etu = $preinscriptionLoader->getAllInfosBac($id_etudiant);
+            
+            foreach ($ids_bacs_etu as $id_bac_etu)
+            {
+                $id_bac = $id_bac_etu ['id_bac'];
+            }
+            
+            $seriesbac = $preinscriptionLoader->getSeriebac($id_etudiant, $id_bac);
+            
+            foreach ($seriesbac as $seriebac)
+            {
+                $seriebacetu = $seriebac ['libelle'];
+                $anneebacetu = $seriebac ['annee_bac'];
+                //$this->getLogger()->info(" Serie BAC : ". $seriebacetu);
+                $id_academie = $seriebac ['id_academie'];
+                
+                //$this->getLogger()->info(" academie N° ". $id_academie);
+            }
+            
+            $academies = $preinscriptionLoader->getAcademies($id_etudiant, $id_bac);
+            
+            foreach ($academies as $academie)
+                {
+                    $uneAcademie = $academie ['libelle'];
+                }
+
             foreach ($infosparents as $infoparent)
             {
                 $id_lien_parente = $infoparent['id_lien_parente'];
@@ -214,18 +242,15 @@ class TransferAgent extends AbstractDataExportAgent
                     else 
                     {
                         $professionMere = $cspparent ['libelle'];
-                        $this->insertDossieretu($am, $professionPere, $professionMere, $ine, $matricule, $anneeBac); 
+                        
+                        $this->insertDossieretu($am, $professionPere, $professionMere, $ine, $matricule, $seriebacetu, $anneebacetu, $uneAcademie); 
                     }
-                    
-                    
                 } 
             }
-     
-                $matricule = $etudiant ['login_ldap'];
-                $anneeBac = 2014;
 
-            
-            // INSERT DU DOSSIER
+                
+                
+                $matricule = $etudiant ['login_ldap'];
            
             //$this->getLogger()->info(var_export($etudiants_id, true));
 
@@ -257,15 +282,9 @@ class TransferAgent extends AbstractDataExportAgent
                 
                 $idetudiantPED = $elementPersonnesRepository->findBy(array(
                     'idexterne' => $idexterne));
-               /* if ($etudiantPED){
-                    return $etudiantPED->getId();
-                }
-                else {
-                    return null;
-                } */
 
-                $this->insertParentetu($im, $idexterneEtu, $nomParent, $prenomParent, $emailParent, $telephonefixeParent, $telephonemobileParent, $codepostalParent, $localiteParent, $paysParent, $adresse1Parent, $professionParent, $lienparente);
-                // Changer $idexterneEtu par $idetudiantPED pour mettre le bon id de personne dans parent
+                $this->insertParentetu($im, $idPers, $nomParent, $prenomParent, $emailParent, $telephonefixeParent, $telephonemobileParent, $codepostalParent, $localiteParent, $paysParent, $adresse1Parent, $professionParent, $lienparente);
+        
             }
             //$this->getLogger ()->info ( var_export( $idetudiantPED,true) );
         }
@@ -392,31 +411,42 @@ class TransferAgent extends AbstractDataExportAgent
         $preEtu->setNumSecu($numsecu);
         // $preEtu->setEmailetb( $emailtab);
         $em->persist($preEtu);
+
+//         $conn = $em->getConnection();
+//         $this->getLogger()->info("LastId".$conn->lastInsertId());
+        
         $em->flush();
         
-        return;
+        $this->getLogger()->info("LastId : ".$preEtu->getId());
+       
+
+        
+        return $preEtu->getId();
     }
 
     
-    public function insertDossieretu($am,  $professionPere, $professionMere, $ine, $matricule, $anneeBac)
+    public function insertDossieretu($am, $professionPere, $professionMere, $ine, $matricule, $seriebacetu, $anneebacetu, $uneAcademie)
     {
         $preEtu = new \Jobs\Model\Entity\DossierEtudiant();
-
+        
         $preEtu->setCsppere($professionPere);
         $preEtu->setCspmere($professionMere);
         $preEtu->setIne($ine);
         $preEtu->setMatricule($matricule);
-        $preEtu->setAnneebac($anneeBac);
+        $preEtu->setSeriebac($seriebacetu);
+        $preEtu->setAnneebac($anneebacetu);
+        $preEtu->setAcademiebac($uneAcademie);
         $am->persist($preEtu);
         $am->flush();
         
         return;
     } 
 
-    public function insertParentetu($im, $idetudiantPED, $nomParent, $prenomParent, $emailParent, $telephonefixeParent, $telephonemobileParent, $codepostalParent, $localiteParent, $paysParent, $adresse1Parent, $professionParent, $lienparente)
+    public function insertParentetu($im, $idPers, $nomParent, $prenomParent, $emailParent, $telephonefixeParent, $telephonemobileParent, $codepostalParent, $localiteParent, $paysParent, $adresse1Parent, $professionParent, $lienparente)
     {
         $preEtu = new \Jobs\Model\Entity\ParentEtudiant();
-        $preEtu->setEtudiant($idetudiantPED);
+        //$preEtu->setEtudiant($idetudiantPED);
+        $preEtu->setEtudiant($idPers);
         $preEtu->setNom($nomParent);
         $preEtu->setPrenom($prenomParent);
         $preEtu->setEmail($emailParent);
