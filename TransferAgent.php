@@ -220,12 +220,32 @@ class TransferAgent extends AbstractDataExportAgent
             }
             
             $academies = $preinscriptionLoader->getAcademies($id_etudiant, $id_bac);
-            
-            foreach ($academies as $academie)
-                {
-                    $uneAcademie = $academie ['libelle'];
-                }
+                foreach ($academies as $academie)
+                    {
+                        $uneAcademie = $academie ['libelle'];
+                    }
+                
+            $diplomes = $preinscriptionLoader->getDiplomes($id_etudiant);
+                foreach ($diplomes as $diplome)
+                    {
+                        $unDiplome = $diplome ['libelle'];
+                        
+                    }
+                    
+            $etablissements = $preinscriptionLoader->getEtablissement($id_etudiant);
+                foreach ($etablissements as $etablissement)
+                    {
+                        $unEtablissement = $etablissement ['nometabl'];
+                        
+                    }
+                    
 
+            $concours = $preinscriptionLoader->getConcours($id_etudiant);
+                foreach ($concours as $concour)
+                    {
+                        $Unconcours = $concour ['libelle'];
+                        
+                    }
             foreach ($infosparents as $infoparent)
             {
                 $id_lien_parente = $infoparent['id_lien_parente'];
@@ -243,7 +263,7 @@ class TransferAgent extends AbstractDataExportAgent
                     {
                         $professionMere = $cspparent ['libelle'];
                         
-                        $this->insertDossieretu($am, $professionPere, $professionMere, $ine, $matricule, $seriebacetu, $anneebacetu, $uneAcademie); 
+                        $this->insertDossieretu($am, $professionPere, $professionMere, $ine, $matricule, $seriebacetu, $anneebacetu, $uneAcademie, $unDiplome, $unEtablissement, $Unconcours); 
                     }
                 } 
             }
@@ -425,7 +445,7 @@ class TransferAgent extends AbstractDataExportAgent
     }
 
     
-    public function insertDossieretu($am, $professionPere, $professionMere, $ine, $matricule, $seriebacetu, $anneebacetu, $uneAcademie)
+    public function insertDossieretu($am, $professionPere, $professionMere, $ine, $matricule, $seriebacetu, $anneebacetu, $uneAcademie, $unDiplome, $unEtablissement, $Unconcours)
     {
         $preEtu = new \Jobs\Model\Entity\DossierEtudiant();
         
@@ -436,6 +456,10 @@ class TransferAgent extends AbstractDataExportAgent
         $preEtu->setSeriebac($seriebacetu);
         $preEtu->setAnneebac($anneebacetu);
         $preEtu->setAcademiebac($uneAcademie);
+        $preEtu->setTypediplome($unDiplome);
+        $preEtu->setEtablissement($unEtablissement);
+        //$preEtu->setAnneeDernDiplome($anneeDernierDiplome);
+        $preEtu->setConcours($Unconcours);
         $am->persist($preEtu);
         $am->flush();
         
