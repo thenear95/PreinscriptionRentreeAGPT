@@ -118,61 +118,77 @@ class PreinscriptionLoader {
 	        ':id_etudiant' => $id_etudiant,
 	        ':id_bac' => $id_bac
 	    );
-	    $sqlSerieBac = "SELECT bac.libelle, etudiant.id_etudiant, bac_etu.*, academie.libelle
+	    $sqlAcademies = "SELECT bac.libelle, etudiant.id_etudiant, bac_etu.*, academie.libelle
         FROM bac_etu
         INNER JOIN etudiant on bac_etu.id_etudiant=etudiant.id_etudiant
         LEFT JOIN bac on bac.id_bac = bac_etu.id_bac
         LEFT JOIN academie on academie.code = bac_etu.id_academie
         WHERE etudiant.id_etudiant =:id_etudiant
         AND bac.id_bac=:id_bac ";
-	    $resultatSqlSerieBac = $pdo->prepare($sqlSerieBac);
-	    $resultatSqlSerieBac->execute($params);
-	    $tableauSerieBac = $resultatSqlSerieBac->fetchAll(\PDO::FETCH_ASSOC);
+	    $resultatSqlAcademies = $pdo->prepare($sqlAcademies);
+	    $resultatSqlAcademies->execute($params);
+	    $tableauToutesAcademies = $resultatSqlAcademies->fetchAll(\PDO::FETCH_ASSOC);
 	    
-	    return $tableauSerieBac;
+	    return $tableauToutesAcademies;
 	}
 	
-/*	
-	public function getAcademie($id_academie)
+	public function getDiplomes($id_etudiant)
 	{
-	    
 	    $pdo = $this->pdo;
 	    
-	    $params = array (
-	        ':id_academie' => $id_academie
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant
 	    );
-
+	    $sqlDiplome = "SELECT diplome.libelle
+        FROM diplome
+        INNER JOIN diplome_etu on diplome_etu.id_diplome=diplome.id_diplome
+        INNER JOIN etudiant on etudiant.id_etudiant=diplome_etu.id_etudiant
+        WHERE etudiant.id_etudiant =:id_etudiant";
+	    $resultatSqlDiplome = $pdo->prepare($sqlDiplome);
+	    $resultatSqlDiplome->execute($params);
+	    $tableauToutDiplomes = $resultatSqlDiplome->fetchAll(\PDO::FETCH_ASSOC);
 	    
-	    try {
-	        $sqlAcademie = "SELECT libelle FROM academie WHERE code=:id_academie";
-	        
-	        $resultatSqlAcademie = $pdo->prepare ( $sqlAcademie );
-	        
-	        $resultatSqlAcademie->execute ($params);
-	        
-	        $tableauAcademie = $resultatSqlAcademie->fetchAll ( \PDO::FETCH_ASSOC );
-	    } catch (\Exception $e) {
-	        $message = "Un problème est survenu  : " . $e->getMessage();
-	        self::alertWarn($message);
-	        $this->getLogger()->err($e->getMessage());
-	        $this->setAlive(false);
-	        return;
-	    } 
-	    
-	    
-
-	    
-	   // $this->getLogger()->info("Count : ". count($tableauAcademie));
-	    
-	    foreach (  $tableauAcademie as $value )
-	    {
-	        $lib = $value['libelle'];
-	    }
-	    
-	    return $lib;
-	    
-	}*/
+	    return $tableauToutDiplomes;
+	}
 	
+	
+    public function getEtablissement($id_etudiant)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant
+	    );
+	    $sqlEtablissement = "SELECT etabliss_etu.nometabl
+        FROM etabliss_etu
+        INNER JOIN etudiant on etudiant.id_etudiant = etabliss_etu.id_etudiant
+        WHERE etudiant.id_etudiant =:id_etudiant";
+	    $resultatSqlEtablissement = $pdo->prepare($sqlEtablissement);
+	    $resultatSqlEtablissement->execute($params);
+	    $tableauToutLesEtab = $resultatSqlEtablissement->fetchAll(\PDO::FETCH_ASSOC);
+	    
+	    return $tableauToutLesEtab;
+	} 
+	
+	public function getConcours($id_etudiant)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant
+	    );
+	    $sqlConcours = "SELECT concours.libelle
+        FROM concours
+        INNER JOIN etudiant on etudiant.id_concours = concours.id_concours
+        WHERE etudiant.id_etudiant =:id_etudiant";
+	    $resultatSqlConcours = $pdo->prepare($sqlConcours);
+	    $resultatSqlConcours->execute($params);
+	    $tableauToutLesConcours = $resultatSqlConcours->fetchAll(\PDO::FETCH_ASSOC);
+	    
+	    return $tableauToutLesConcours;
+	}
+	
+
 	/*
 	public function getCsppere($id_profession)
 	{
@@ -203,7 +219,11 @@ class PreinscriptionLoader {
 	
 	//Requete permettant de remplacer les caractères speciaux par ...
 	/*UPDATE diplome_etu
-	SET intitule = REPLACE(intitule, 'ÃƒÂ©', 'texte de remplacement')*/
+	SET intitule = REPLACE(intitule, 'ÃƒÂ©', 'texte de remplacement')
+	
+	*
+	*SELECT * FROM `etudiant` WHERE INE='2505001527X'
+	*/
     
 	
 	/**
