@@ -4,6 +4,7 @@ namespace Jobs\Model\Process\DataTransfer\Acquisition\Rentree\Etudiants\Preinscr
 use Minibus\Model\Process\DataTransfer\Export\AbstractDataExportAgent;
 use Minibus\Model\Entity\Execution;
 use Jobs\Model\Entity\Personne;
+
 use Jobs\Model\Entity\DossierEtudiant;
 // use Jobs\Model\Process\DataTransfer\Acquisition\Rentree\ConvertPersonne;
 use Doctrine\DBAL\Driver\PDOException;
@@ -40,6 +41,9 @@ class TransferAgent extends AbstractDataExportAgent
         
         $im = $this->getEntityManager();
         $elementParentRepository = $this->getElementParentRepository($im);
+        
+        $ym = $this->getEntityManager();
+        $elementInsAdminEtuRepository = $this->getElementInsAdminEtuRepository($ym);
         
         $this->getLogger()->info("Début acquisition étudiants depuis Préinscription");
         $pdo = $this->getPreinscriptionConnexion();
@@ -80,6 +84,7 @@ class TransferAgent extends AbstractDataExportAgent
         // Pour chaque étudiant, récupération de ses candidatures dans PED
         foreach ($etudiants as $etudiant) {
             // PERSONNE
+            
             $id_etudiant = $etudiant['id_etudiant'];
             $sitMaritaleEtu = $etudiant['id_situation_familiale'];
             $idEtudiantPreinscription = $etudiant['id_etudiant'];
@@ -104,7 +109,7 @@ class TransferAgent extends AbstractDataExportAgent
             $pays = 1;
             $bpubliphoto = $etudiant['photo_valide'];
             $numsecu = $etudiant['N_Securite_Soc'];
-            
+            $matricule = $etudiant ['login_ldap'];
             $ine = $etudiant['INE'];
             
             $adresses = $preinscriptionLoader->getAdresse($id_etudiant);
@@ -209,14 +214,13 @@ class TransferAgent extends AbstractDataExportAgent
             
             $seriesbac = $preinscriptionLoader->getSeriebac($id_etudiant, $id_bac);
             
+            $seriebacetu = '';
             foreach ($seriesbac as $seriebac)
             {
                 $seriebacetu = $seriebac ['libelle'];
                 $anneebacetu = $seriebac ['annee_bac'];
-                //$this->getLogger()->info(" Serie BAC : ". $seriebacetu);
                 $id_academie = $seriebac ['id_academie'];
                 
-                //$this->getLogger()->info(" academie N° ". $id_academie);
             }
             
             $academies = $preinscriptionLoader->getAcademies($id_etudiant, $id_bac);
@@ -233,19 +237,26 @@ class TransferAgent extends AbstractDataExportAgent
                     }
                     
             $etablissements = $preinscriptionLoader->getEtablissement($id_etudiant);
+            $unEtablissement="";
                 foreach ($etablissements as $etablissement)
                     {
-                        $unEtablissement = $etablissement ['nometabl'];
-                        
+
+                        if ($etablissement ['id_etabliss_Arvus'] == 999999)
+                        {
+                            $unEtablissement = $etablissement ['autre_lycee'];
+                        }
+                        else 
+                            $unEtablissement = $etablissement ['libelle']; 
                     }
-                    
 
             $concours = $preinscriptionLoader->getConcours($id_etudiant);
                 foreach ($concours as $concour)
                     {
                         $Unconcours = $concour ['libelle'];
-                        
+                        $idConcours = $concour ['id_concours'];
                     }
+                    
+                    // faire un if pour les id_concours=1 pour les rang !!! 
             foreach ($infosparents as $infoparent)
             {
                 $id_lien_parente = $infoparent['id_lien_parente'];
@@ -269,8 +280,6 @@ class TransferAgent extends AbstractDataExportAgent
             }
 
                 
-                
-                $matricule = $etudiant ['login_ldap'];
            
             //$this->getLogger()->info(var_export($etudiants_id, true));
 
@@ -307,6 +316,70 @@ class TransferAgent extends AbstractDataExportAgent
         
             }
             //$this->getLogger ()->info ( var_export( $idetudiantPED,true) );
+            
+            //INSADMINETU
+            
+            $dossier_id = 1;
+            $typeinscription = 'Principale';
+            //$this->getLogger ()->info ( ":".$idConcours);
+            if ($idCandidatPCL == null)
+            {    
+                $voieentree = $Unconcours;
+                $cursus = 'Ingénieur';
+                $diplomeinvariable = 'ING';
+                $niveau = '1A';
+            }
+            
+            else 
+            {    
+                $voieentree ='';
+                $cursus = 'M1/M2';
+                $diplomeinvariable = ' A REMPLIR';
+                $niveau = 'M1/M2';            
+            }
+            
+            $statutscolarite = 'En scolarité';
+            
+            $date=date("y");
+            $promoorig = $date;
+            $promorattach1 = $promoorig;
+            
+            $observations = $preinscriptionLoader->getOberservations($id_etudiant);
+            $uneObservation ='';
+            foreach ($observations as $observation)
+                {
+                    $uneObservation = $observation['info'];
+                    //$this->getLogger ()->info ( "OBS : ".$uneObservation);
+                    $this->getLogger ()->info ( "ID : ".$id_etudiant);
+                }
+                
+            $regimeinscription = 'Formation initiale';
+            
+            $LibellesBourses = $preinscriptionLoader->getBourse($id_etudiant);
+            $unLibelleBourse ='';
+            foreach ($LibellesBourses as $LibelleBourse)
+            {
+                $unLibelleBourse = $LibelleBourse['libelle'];
+            }
+            
+            //$profils = $preinscriptionLoader->getProfil($id_etudiant);
+            
+            $id_profil = $preinscriptionLoader->getProfil($id_etudiant);
+            $this->getLogger()->info("ID PRO : " . $id_profil);
+//             $id_profil ='0';
+//             foreach ($profils as $profil)
+//             {
+//                 $id_profil = $profil['id_profil'];
+//                 $this->getLogger()->info("ID PRO : " . $id_profil);
+//             }
+            
+            $situation ='Préparation';
+                
+                //$dossier = $etudiant->getDossierEtudiant();
+                
+            $this->insertInsAdminEtu($ym, /*$dossier,*/ $typeinscription, $voieentree, $cursus, $statutscolarite, $promoorig, $promorattach1, $diplomeinvariable, $niveau, $uneObservation, $regimeinscription, $unLibelleBourse, $id_profil, $situation);
+            
+            
         }
         
         $this->getLogger()->info(" Fin du processus.");
@@ -379,6 +452,25 @@ class TransferAgent extends AbstractDataExportAgent
         }
         return $elementParentRepository;
     }
+    
+    
+    // INSADMINETU
+    /**
+     *
+     * @return void|\Doctrine\ORM\EntityRepository
+     */
+    public function getElementInsAdminEtuRepository($entityManager)
+    {
+        try {
+            $elementInsAdminEtuRepository = $entityManager->getRepository('Jobs\Model\Entity\InsAdminEtudiant');
+        } catch (Exception $e) {
+            $this->setAlive(false);
+            $this->getLogger()->err($e->getMessage());
+            
+            return;
+        }
+        return $elementInsAdminEtuRepository;
+    }
 
     /**
      *
@@ -437,7 +529,7 @@ class TransferAgent extends AbstractDataExportAgent
         
         $em->flush();
         
-        $this->getLogger()->info("LastId : ".$preEtu->getId());
+        //$this->getLogger()->info("LastId : ".$preEtu->getId());
        
 
         
@@ -469,7 +561,6 @@ class TransferAgent extends AbstractDataExportAgent
     public function insertParentetu($im, $idPers, $nomParent, $prenomParent, $emailParent, $telephonefixeParent, $telephonemobileParent, $codepostalParent, $localiteParent, $paysParent, $adresse1Parent, $professionParent, $lienparente)
     {
         $preEtu = new \Jobs\Model\Entity\ParentEtudiant();
-        //$preEtu->setEtudiant($idetudiantPED);
         $preEtu->setEtudiant($idPers);
         $preEtu->setNom($nomParent);
         $preEtu->setPrenom($prenomParent);
@@ -487,6 +578,38 @@ class TransferAgent extends AbstractDataExportAgent
         
         return;
     }
+    
+    
+    public function insertInsAdminEtu($ym, /*$dossier,*/ $typeinscription, $voieentree, $cursus, $statutscolarite, $promoorig, $promorattach1, $diplomeinvariable, $niveau, $uneObservation, $regimeinscription, $unLibelleBourse, $id_profil, $situation)
+    {
+        $preEtu = new \Jobs\Model\Entity\InsAdminEtudiant();
+        
+        //$dos = new \Jobs\Model\Entity\DossierEtudiant();
+        
+        
+        //$dos->setDossier($dossier);
+        
+        
+        
+        $preEtu->setVoieentree($voieentree);
+        $preEtu->setTypeinscription($typeinscription);
+        $preEtu->setCursus($cursus);
+        $preEtu->setStatutscolarite($statutscolarite);
+        $preEtu->setPromoorig($promoorig);
+        $preEtu->setPromorattach1($promorattach1);
+        $preEtu->setDiplomeinvariable($diplomeinvariable);
+        $preEtu->setNiveau($niveau);
+        $preEtu->setObservations($uneObservation);
+        $preEtu->setRegimeinscription($regimeinscription);
+        $preEtu->setIdprofil($id_profil);
+        $preEtu->setSituation($situation);
+        $preEtu->setBourse($unLibelleBourse);
+        
+        $ym->persist($preEtu);
+        $ym->flush();
+        
+        return;
+    } 
 
     function isUTF8($string)
     {
