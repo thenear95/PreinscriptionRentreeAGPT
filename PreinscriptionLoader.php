@@ -159,10 +159,10 @@ class PreinscriptionLoader {
 	    $params = array(
 	        ':id_etudiant' => $id_etudiant
 	    );
-	    $sqlEtablissement = "SELECT etabliss_etu.nometabl
-        FROM etabliss_etu
-        INNER JOIN etudiant on etudiant.id_etudiant = etabliss_etu.id_etudiant
-        WHERE etudiant.id_etudiant =:id_etudiant";
+	    $sqlEtablissement = "SELECT bac_etu.id_etabliss_Arvus, etabliss_Arvus.libelle, bac_etu.autre_lycee
+        FROM bac_etu
+        LEFT JOIN etabliss_Arvus on etabliss_Arvus.id_etabliss_Arvus = bac_etu.id_etabliss_Arvus
+        WHERE bac_etu.id_etudiant =:id_etudiant AND bac_etu.id_etabliss_Arvus<>0 ";
 	    $resultatSqlEtablissement = $pdo->prepare($sqlEtablissement);
 	    $resultatSqlEtablissement->execute($params);
 	    $tableauToutLesEtab = $resultatSqlEtablissement->fetchAll(\PDO::FETCH_ASSOC);
@@ -177,7 +177,7 @@ class PreinscriptionLoader {
 	    $params = array(
 	        ':id_etudiant' => $id_etudiant
 	    );
-	    $sqlConcours = "SELECT concours.libelle
+	    $sqlConcours = "SELECT concours.libelle, concours.id_concours
         FROM concours
         INNER JOIN etudiant on etudiant.id_concours = concours.id_concours
         WHERE etudiant.id_etudiant =:id_etudiant";
@@ -186,6 +186,68 @@ class PreinscriptionLoader {
 	    $tableauToutLesConcours = $resultatSqlConcours->fetchAll(\PDO::FETCH_ASSOC);
 	    
 	    return $tableauToutLesConcours;
+	}
+	
+	
+	public function getOberservations($id_etudiant)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant
+	    );
+	    $sqlObservations = "SELECT infoComp.info
+        FROM infoComp
+        INNER JOIN etudiant on etudiant.id_etudiant = infoComp.id_etudiant
+        WHERE etudiant.id_etudiant =:id_etudiant";
+	    $resultatSqlObservations = $pdo->prepare($sqlObservations);
+	    $resultatSqlObservations->execute($params);
+	    $tableauToutLesObs = $resultatSqlObservations->fetchAll(\PDO::FETCH_ASSOC);
+	    
+	    return $tableauToutLesObs;
+	}
+	
+	
+	public function getBourse($id_etudiant)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant
+	    );
+	    $sqlBourse = "SELECT bourse.libelle
+        FROM bourse
+        INNER JOIN etudiant on etudiant.id_bourse = bourse.id_bourse
+        WHERE etudiant.id_etudiant =:id_etudiant";
+	    $resultatSqlBourse = $pdo->prepare($sqlBourse);
+	    $resultatSqlBourse->execute($params);
+	    $tableauBourse= $resultatSqlBourse->fetchAll(\PDO::FETCH_ASSOC);
+	    
+	    return $tableauBourse;
+	}
+	
+	
+	public function getProfil($id_etudiant)
+	{
+	    $pdo = $this->pdo;
+	    
+	    $params = array(
+	        ':id_etudiant' => $id_etudiant
+	    );
+	    $sqlProfil = "SELECT niveauForm.id_profil
+        FROM niveauForm
+        INNER JOIN etudiant on etudiant.id_niveauForm = niveauForm.id_niveauForm
+        WHERE etudiant.id_etudiant =:id_etudiant";
+	    $resultatSqlProfil = $pdo->prepare($sqlProfil);
+	    $resultatSqlProfil->execute($params);
+	    $tableauProfil= $resultatSqlProfil->fetchAll(\PDO::FETCH_ASSOC);
+	    
+	    $id_profil = NULL; 
+	    foreach ($tableauProfil as $value)
+            {
+                $id_profil = $value['id_profil'];
+            }
+	    return $id_profil;
 	}
 	
 
