@@ -14,11 +14,13 @@ use Jobs\Model\Entity\InsAdminEtudiant;
 
 class TransferAgent extends AbstractEntPersonneExportAgent
 {
-
+    
+    protected $hashCalculator;
+    
     const UAIAgro = '0753465J';
-
+    
     // protected $elementPersonnesRepository;
- 
+    
     public function run()
     {
         $this->getLogger()->info("Exécution en mode " . $this->getExecutionMode());
@@ -31,7 +33,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
                 $this->runControl();
         }
     }
-
+    
     public function runSync()
     {
         
@@ -52,6 +54,8 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         
         $this->getLogger()->info("Début acquisition étudiants depuis Préinscription");
         $pdo = $this->getPreinscriptionConnexion();
+        
+        $hashCalculator = $this->getServiceLocator()->get('hash-calculator');
         
         if (false === $pdo) {
             $this->setAlive(false);
@@ -85,16 +89,16 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         $nbPersonnesNonRecuperees = 0;
         
         $i = 1;
-
+        
 //---------------------- PERSONNE ----------------------------------------------------------
-        // Pour chaque étudiant, récupération de ses candidatures dans PED
+        // Pour chaque étudiant
         foreach ($tabEtudiants as $tabEtudiant) {
-
+            
+            $hashCalculator = $this->getServiceLocator()->get('hash-calculator');
+            
             //Id dans la base d'origine pour récupération des données dans les objets liés
-            //Doit-on set l'id_etudiant de l'ancienne base ??
             $id_etudiant = $tabEtudiant['id_etudiant'];
-            $login = $tabEtudiant['login_ldap']; // supprimer ses lignes ?? car elles sont en bas en set ?
-            // $datenaiss = $tabEtudiant ['date_naissance'];
+            $login = $tabEtudiant['login_ldap'];
             $updated = 0;
             $idCandidatPCL = $tabEtudiant['id_candidat_PCL'];
             $sexe = $tabEtudiant['sexe'];
@@ -102,20 +106,54 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             
             $idEtudiantPreinscription = $tabEtudiant['id_etudiant'];
             
-            //Création de l'étudiant pour PED    
-            $etudiant = new Etudiant();
             
-            if ($idCandidatPCL == null) 
+            if ($idCandidatPCL == null)
             {
                 $idexterne = "preetu" . $idEtudiantPreinscription;
-            } 
-            else 
+            }
+            else
             {
                 $idexterne = "preetu" . $idCandidatPCL;
             }
+            
+            //Vérification que l'étudiant existe sur idexterne. si Existe Update sinon Insert
+            //Tente de récupérer un Etudiant sur son idExerne
+            $etudiant = $em->getRepository('Jobs\Model\Entity\Etudiant')->findOneBy(array(
+                'idexterne' => $idexterne
+            ));
+            $modeUpdate = true;
+            if (!isset($etudiant)){
+                //Création de l'étudiant pour PED
+                $etudiant = new Etudiant();
+                $modeUpdate = false;
+            }
+            
             $etudiant->setIdExterne($idexterne);
             $etudiant->setLogin($tabEtudiant['login_ldap']);
             $etudiant->setSexe($tabEtudiant['sexe']);
+            
+            $hashEtudiant = array(
+                $tabEtudiant
+            );
+            
+            //$this->getLogger()->info("Calcul du hash");
+            
+            $hash = $hashCalculator->getHash($hashEtudiant);
+            $etudiant->setHash($hash);
+            
+            // if ($hashEtudiant != $hash){
+            
+            // $this->getLogger()->info("Mise à jour");
+            // 
+//             }
+
+            // else 
+            //    {
+            //        $this->getLogger()->info("Insert");
+              //      $etudiant = new Etudiant();
+              //  }
+            
+            //$etudiant->setDatenaiss($tabEtudiant['date_naissance']);
             
             // Civilité par rapport au sexe
             $civilite = "Mme";
@@ -125,15 +163,22 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             $etudiant->setCivilite($civilite);
             
             $etudiant->setNom($tabEtudiant['Nom']);
-
-            //Prenom 1 peut contenir plusieurs prénoms, on veut récupérer le premier    
+            
+            //Prenom 1 peut contenir plusieurs prénoms, on veut récupérer le premier
             $prenomP = explode(",", $tabEtudiant['Prenom1']);
             $prenom1 = $this->encodeIfNonUTF8($prenomP[0]);
             $etudiant->setPrenom($prenom1);
-            //TODO concaténer la fin de $prenomP avec Prenom2
-            $etudiant->setPrenomAutre($tabEtudiant['Prenom2']);
-
-            $sitMaritale = "Non indiqué"; // null ou 0
+            
+           $prenom2 = $tabEtudiant['Prenom2'];
+           // On parcours le tableau explosé de prenomP pour avoir chaque valeur pour concatener le prenom2 avec la suite des Prenoms1
+           $prenomAutre = $prenom2;
+           unset($prenomP[0]);
+           foreach ($prenomP as $prenomA) {
+               $prenomAutre .= ','.$prenomA;
+            }
+            $etudiant->setPrenomAutre($prenomAutre);
+            
+            $sitMaritale = "Non indiqué";
             if ($sitMaritaleEtu == 1) {
                 $sitMaritale = "Célibataire";
             }elseif ($sitMaritaleEtu == 2) {
@@ -150,40 +195,45 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             $etudiant->setVillenaiss($tabEtudiant['ville_naissance']);
             $etudiant->setTelephoneFixe($tabEtudiant['telephone']);
             $etudiant->setTelephoneMobile($tabEtudiant['mobile']);
-            //Pas de setMatricule dans Personne ?
-            //$etudiant->setMatricule($tabEtudiant['login_ldap']);
             $etudiant->setEmail($tabEtudiant['mel']);
+            
+            $loginPourEmail = $tabEtudiant['login_ldap'];
+            $emailETB = $loginPourEmail ."@agroparistech.fr";
+            $etudiant->setEmailetb($emailETB);
+            
+            
             $etudiant->setPays(1);
             $etudiant->setBpubliphotointranet($tabEtudiant['photo_valide']);
             $etudiant->setNumSecu($tabEtudiant['N_Securite_Soc']);
             
-            //On prend la première adresse
-//             $tabAdresses = $preinscriptionLoader->getAdresse($id_etudiant);
-//             $etudiant->setCodePostal($tabAdresses[0]['codeP']);
-//             $etudiant->setLocalite($tabAdresses[0]['ville']);
-//             $etudiant->setAdresse1($tabAdresses[0]['rue']);
-
             $tabAdresses = $preinscriptionLoader->getAdresse($id_etudiant);
             foreach ($tabAdresses as $tabAdresse) {
                 $adresse1 = $tabAdresse['rue'];
                 $localite = $tabAdresse['ville'];
                 $codePostal = $tabAdresse['codeP'];
-                // $this->getLogger ()->info ( "CP :".$codePostal);
             }
             $etudiant->setAdresse1($adresse1);
             $etudiant->setLocalite($localite);
             $etudiant->setCodepostal($codePostal);
-        
+
             $em->persist($etudiant);
             $em->flush();
             
-// ------------------------------- DOSSIER ----------------------------------------------------
-            //Création du dossier pour PED  
-            $dossier = new DossierEtudiant();
+            $this->getLogger ()->info ( "etudiant :".$id_etudiant);
+ // ------------------------------- DOSSIER ----------------------------------------------------
             
-            $dossier->setEtudiant($etudiant);
+            $dossier = null;
+            if ($modeUpdate){
+                //récupère le dossier existant
+                $dossier = $etudiant->getDossierEtudiant();
+            }
+            if (!isset($dossier)){
+                // Création du dossier pour PED
+                $dossier = new DossierEtudiant();
+                $dossier->setEtudiant($etudiant);
+            }
             
-           $tabInfosparents = $preinscriptionLoader->getInfosParentEtu($id_etudiant);
+            $tabInfosparents = $preinscriptionLoader->getInfosParentEtu($id_etudiant);
             $professionPere = '';
             $professionMere = '';
             
@@ -206,13 +256,13 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             $dossier->setIne($tabEtudiant['INE']);
             $dossier->setMatricule($tabEtudiant['login_ldap']);
             
-           $tabIds_bacs_etu = $preinscriptionLoader->getAllInfosBac($id_etudiant);
+            $tabIds_bacs_etu = $preinscriptionLoader->getAllInfosBac($id_etudiant);
             foreach ($tabIds_bacs_etu as $tabId_bac_etu)
             {
                 $id_bac = $tabId_bac_etu['id_bac'];
             }
             
-           $tabSeriesbac = $preinscriptionLoader->getSeriebac($id_etudiant, $id_bac);
+            $tabSeriesbac = $preinscriptionLoader->getSeriebac($id_etudiant, $id_bac);
             $seriebacetu = '';
             foreach ($tabSeriesbac as $tabSeriebac)
             {
@@ -223,20 +273,20 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             $dossier->setSeriebac($seriebacetu);
             $dossier->setAnneebac($anneebacetu);
             
-           $tabAcademies = $preinscriptionLoader->getAcademies($id_etudiant, $id_bac);
+            $tabAcademies = $preinscriptionLoader->getAcademies($id_etudiant, $id_bac);
             foreach ($tabAcademies as $tabAcademie)
             {
                 $uneAcademie = $tabAcademie['libelle'];
             }
             $dossier->setAcademiebac($uneAcademie);
             
-           $tabDiplomes = $preinscriptionLoader->getDiplomes($id_etudiant);
+            $tabDiplomes = $preinscriptionLoader->getDiplomes($id_etudiant);
             foreach ($tabDiplomes as $tabDiplome) {
                 $unDiplome = $tabDiplome['libelle'];
             }
             $dossier->setTypediplome($unDiplome);
             
-           $tabEtablissements = $preinscriptionLoader->getEtablissement($id_etudiant);
+            $tabEtablissements = $preinscriptionLoader->getEtablissement($id_etudiant);
             $unEtablissement = "";
             foreach ($tabEtablissements as $tabEtablissement) {
                 
@@ -247,11 +297,11 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             }
             $dossier->setEtablissement($unEtablissement);
             
-           $tabLycees = $preinscriptionLoader->getEtablissement($id_etudiant);
+            $tabLycees = $preinscriptionLoader->getEtablissement($id_etudiant);
             $unLycee = "";
             foreach ($tabLycees as $tabLycee) {
                 
-                if ($tabLycee['id_etabliss_Arvus'] == 999999) 
+                if ($tabLycee['id_etabliss_Arvus'] == 999999)
                 {
                     $unLycee = $tabLycee['autre_lycee'];
                 } else
@@ -259,7 +309,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             }
             $dossier->setLycee($unLycee);
             
-           $tabDerniersDiplomes = $preinscriptionLoader->getLibelleDiplomes($id_etudiant);
+            $tabDerniersDiplomes = $preinscriptionLoader->getLibelleDiplomes($id_etudiant);
             $intituleDernDiplome = '';
             $annedernierDiplome = '';
             foreach ($tabDerniersDiplomes as $tabDernierDiplome)
@@ -267,30 +317,31 @@ class TransferAgent extends AbstractEntPersonneExportAgent
                 $intituleDernDiplome = $tabDernierDiplome['intitule'];
                 $annedernierDiplome = $tabDernierDiplome['delivre'];
             }
+            
             $dossier->setIntituleDernDiplome($intituleDernDiplome);
             $dossier->setAnneeDernDiplome($annedernierDiplome);
             
-          $tabConcours = $preinscriptionLoader->getConcours($id_etudiant);
-           foreach ($tabConcours as $tabConcour)
+            $tabConcours = $preinscriptionLoader->getConcours($id_etudiant);
+            foreach ($tabConcours as $tabConcour)
             {
                 $Unconcours = $tabConcour['libelle'];
                 $idConcours = $tabConcour['id_concours'];
             }
             $dossier->setConcours($Unconcours);
-  
+            
             //$this->getLogger()->info("IDEXT : " . $idexterne);
             //$personnePourEtudiant = $this->getPersonneByIdExterne($idexterne);
             
             $am->persist($dossier);
             $am->flush();
             
-//------------------------------PARENT---------------------------------------------------------
+            //------------------------------PARENT---------------------------------------------------------
             $parent = new ParentEtudiant();
             $tabParents = $preinscriptionLoader->getInfosParentEtu($id_etudiant);
             
-            foreach ($tabParents as $tabParent) 
+            foreach ($tabParents as $tabParent)
             {
-
+                
                 $parent->setEtudiant($etudiant->getId());
                 $parent->setNom($tabParent['nom']);
                 $parent->setPrenom($tabParent['prenom']);
@@ -304,11 +355,11 @@ class TransferAgent extends AbstractEntPersonneExportAgent
                 $parent->setProfession($tabParent['profession']);
                 
                 $idLienParent = $tabParent['id_lien_parente'];
-    
+                
                 $lienparente = "mere";
                 if ($idLienParent == 1) {
                     $lienparente = "pere";
-                } 
+                }
                 
                 $parent->setLienparente($lienparente);
             }
@@ -316,11 +367,10 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             $im->persist($parent);
             $im->flush();
             
-//---------------------------------INSADMINETU---------------------------------------------------
+            //---------------------------------INSADMINETU---------------------------------------------------            
             $insAdminEtu = new InsAdminEtudiant();
-            
             $insAdminEtu->setDossier($dossier);
-            
+
             $insAdminEtu->setTypeinscription('Principale');
             
             if ($idCandidatPCL == null) {
@@ -328,7 +378,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
                 $cursus = 'Ingénieur';
                 $diplomeinvariable = 'ING';
                 $niveau = '1A';
-            } 
+            }
             else {
                 $voieentree = '';
                 $cursus = 'M1/M2';
@@ -373,7 +423,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             $insAdminEtu->setBourse($unLibelleBourse);
             
             $id_profil = $preinscriptionLoader->getProfil($id_etudiant);
-
+            
             
             $situation = 'Préparation';
             $insAdminEtu->setSituation($situation);
@@ -382,12 +432,12 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             $ym->flush();
         }
         
-// --------------------------------- FIN ------------------------------------------------------
+        // --------------------------------- FIN ------------------------------------------------------
         
         $this->getLogger()->info(" Fin du processus.");
-        $this->setAlive(false);
+$this->setAlive(false);
     }
-
+    
     // $this->setAlive ( false );
     
     /**
@@ -400,7 +450,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         $this->getLogger()->info(" Fin du processus.");
         $this->setAlive(false);
     }
-
+    
     // PERSONNE
     /**
      *
@@ -418,7 +468,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         }
         return $elementPersonnesRepository;
     }
-
+    
     // DOSSIER
     /**
      *
@@ -436,7 +486,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         }
         return $elementDossierRepository;
     }
-
+    
     // PARENT
     /**
      *
@@ -454,7 +504,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         }
         return $elementParentRepository;
     }
-
+    
     // INSADMINETU
     /**
      *
@@ -472,7 +522,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         }
         return $elementInsAdminEtuRepository;
     }
-
+    
     /**
      *
      * @return boolean|Minibus\Model\Process\DataTransfer\EndPointConnection
@@ -491,7 +541,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
         }
         return $pdo;
     }
-
+    
     /**
      *
      * @return Personne
@@ -500,103 +550,18 @@ class TransferAgent extends AbstractEntPersonneExportAgent
     {
         error_log("getPersonneByIdExterne " . $personnelIdentifier);
         $tabEtudiantTest = $this->getElementPersonnesRepository($this->getEntityManager())
-            ->findOneBy(array(
+        ->findOneBy(array(
             'idexterne' => $personnelIdentifier
         ));
         
         return $tabEtudiantTest;
     }
     
-    
-    
-    /**
-     * Fonction de mise à jour d'une personne dans la base de données PED.
-     *
-     * @param unknown $em
-     *            : entity manager
-     * @param array $personne
-     *            : tableau regroupant les informations de la personne.
-     * @param array $etudiant
-     *            : tableau regroupant les informations de l'étudiant.
-     * @param string $temoinValidation
-     * @param string $dateValidation
-     * @param string $dateAbandon
-     * @param string $situationPCL
-     * @param string $codeSise
-     *            : code SISE du diplôme
-     * @return $updated : indiquant si la personne a été mise à jour (1) ou non (0)
-     */
-    public function updateCandidature($em, $candidature, $etudiant, $temoinValidation, $dateValidation, $dateAbandon, $situationPCL, $codeSise,$codeEtu,$emailEtab,$anneeArrive,$mentionRof)
-    {
-        $updated = 0;
-        
-        // Si situationPCL = IA ou IA-IP
-        if ($situationPCL !== 'IP') {
-            $candidature->setBIaTemValide ( $temoinValidation );
-            $candidature->setDIaRealisation ( $dateValidation );
-            $candidature->setDIaAnnulation ( $dateAbandon );
-            
-            $candidature->setCIaUai ( self::UAIAgro );
-            
-            if ($etudiant ['valideDeve'] == 1) {
-                $candidature->setCIaRegimeInscription ( $etudiant ['code_SISE_reg_ins'] );
-                
-                if ($temoinValidation == 'O') {
-                    
-                    $candidature->setCIaSise ( $codeSise );
-                    
-                    if ($etudiant ['INE_valid'] == 1) {
-                        $candidature->setCIaIneControle ( $etudiant ['INE'] );
-                    }
-                }
-            }
-            
-            $updated = 1;
-            $this->setAlive ( true );
-        }
-        
-        // Si situationPCL = IP ou IA-IP
-        if ($situationPCL !== 'IA') {
-            if ($temoinValidation == 'R' && $etudiant ['valideDeve'] == 1) {
-                $temoinValidation = 'O';
-            }
-            if ($temoinValidation !== 'R')
-            {
-                $candidature->setBIrTemValide ( $temoinValidation );
-                $candidature->setDIrRealisation ( $dateValidation );
-                $candidature->setDIrAnnulation ( $dateAbandon );
-                $candidature->setCIrUai ( self::UAIAgro );
-                $updated = 1;
-                $this->setAlive ( true );
-            }
-        }
-        // On essaye de récupérer en base de données la candidature résultat correspondante de manière à faire un
-        // update et non un insert si besoin
-        $candidatureResultat = $em->getRepository('Jobs\Model\Entity\CandidatureResultat')->findOneBy(
-            array(
-                'id_candidature' => $candidature->getIdCandidature()
-            )
-            );
-        
-        // Cast en CandidatureResultat
-        $candidatureResultat = static::toCandidatureResultat($candidature, $candidatureResultat);
-        $candidatureResultat->setCEtuLocal($codeEtu);
-        $candidatureResultat->setEmailEtab($emailEtab);
-        $candidatureResultat->setAnneeArrive($anneeArrive);
-        $candidatureResultat->setMentionRof($mentionRof);
-        $em->persist ( $candidatureResultat );
-        $em->flush ();
-        return $updated;
-    }
-    
-    
-    
-
     function isUTF8($string)
     {
         return (utf8_encode(utf8_decode($string)) == $string);
     }
-
+    
     function encodeIfNonUTF8($string)
     {
         if ($this->isUTF8($string)) {
@@ -605,12 +570,12 @@ class TransferAgent extends AbstractEntPersonneExportAgent
             return utf8_encode($string);
         }
     }
-
+    
     public function convertIdExterne($id)
     {
         return $id;
     }
-
+    
     public function findIdETu($idExterne)
     {
         $tabEtudiantPED = $elementPersonnesRepository->findBy(array(
