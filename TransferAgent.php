@@ -174,7 +174,7 @@ class TransferAgent extends AbstractEntPersonneExportAgent
            $prenomAutre = $prenom2;
            unset($prenomP[0]);
            foreach ($prenomP as $prenomA) {
-               $prenomAutre .= ','.$prenomA;
+               $prenomAutre .= ''.$prenomA;
             }
             $etudiant->setPrenomAutre($prenomAutre);
             
